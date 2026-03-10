@@ -11,7 +11,6 @@ import {
   FileUp,
   RefreshCw,
   Upload,
-  X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useRef, useState } from "react";
@@ -19,7 +18,6 @@ import { toast } from "sonner";
 
 type SendState =
   | { phase: "idle" }
-  | { phase: "file-selected"; file: File }
   | { phase: "uploading"; file: File; progress: number }
   | { phase: "success"; code: string; fileName: string };
 
@@ -29,18 +27,48 @@ export function SendTab() {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((file: File) => {
-    setState({ phase: "file-selected", file });
-  }, []);
+  const handleUpload = useCallback(
+    async (file: File) => {
+      if (!actor) return;
+
+      const buffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(buffer);
+      const blob = ExternalBlob.fromBytes(uint8).withUploadProgress(
+        (percentage: number) => {
+          setState((prev) =>
+            prev.phase === "uploading"
+              ? { phase: "uploading", file, progress: Math.round(percentage) }
+              : prev,
+          );
+        },
+      );
+
+      setState({ phase: "uploading", file, progress: 0 });
+
+      try {
+        const code = await actor.createShare(
+          blob,
+          file.name,
+          BigInt(file.size),
+          file.type || "application/octet-stream",
+        );
+        setState({ phase: "success", code, fileName: file.name });
+      } catch {
+        toast.error("Upload failed. Please try again.");
+        setState({ phase: "idle" });
+      }
+    },
+    [actor],
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
       const file = e.dataTransfer.files[0];
-      if (file) handleFileSelect(file);
+      if (file) handleUpload(file);
     },
-    [handleFileSelect],
+    [handleUpload],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -52,37 +80,13 @@ export function SendTab() {
     setIsDragging(false);
   }, []);
 
-  const handleUpload = async () => {
-    if (state.phase !== "file-selected" || !actor) return;
-    const { file } = state;
-
-    const buffer = await file.arrayBuffer();
-    const uint8 = new Uint8Array(buffer);
-    const blob = ExternalBlob.fromBytes(uint8).withUploadProgress(
-      (percentage: number) => {
-        setState((prev) =>
-          prev.phase === "uploading" || prev.phase === "file-selected"
-            ? { phase: "uploading", file, progress: Math.round(percentage) }
-            : prev,
-        );
-      },
-    );
-
-    setState({ phase: "uploading", file, progress: 0 });
-
-    try {
-      const code = await actor.createShare(
-        blob,
-        file.name,
-        BigInt(file.size),
-        file.type || "application/octet-stream",
-      );
-      setState({ phase: "success", code, fileName: file.name });
-    } catch {
-      toast.error("Upload failed. Please try again.");
-      setState({ phase: "file-selected", file });
-    }
-  };
+  const handleFileInput = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) handleUpload(file);
+    },
+    [handleUpload],
+  );
 
   const handleReset = () => {
     setState({ phase: "idle" });
@@ -147,6 +151,7 @@ export function SendTab() {
             <div className="flex gap-3">
               <Button
                 onClick={handleCopyCode}
+                data-ocid="send.primary_button"
                 className="flex-1 h-12 bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl font-medium shadow-glow-sm"
               >
                 <Copy className="w-4 h-4 mr-2" />
@@ -164,29 +169,22 @@ export function SendTab() {
           </motion.div>
         )}
 
-        {/* Idle / File Selected / Uploading States */}
-        {state.phase !== "success" && (
+        {/* Idle State */}
+        {state.phase === "idle" && (
           <motion.div
-            key="upload"
+            key="idle"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.3 }}
-            className="space-y-4"
           >
-            {/* Hidden file input */}
             <input
               ref={fileInputRef}
               type="file"
               id="file-upload-input"
               className="sr-only"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFileSelect(f);
-              }}
+              onChange={handleFileInput}
             />
-
-            {/* Dropzone as label */}
             <label
               htmlFor="file-upload-input"
               data-ocid="send.dropzone"
@@ -195,132 +193,76 @@ export function SendTab() {
               onDragLeave={handleDragLeave}
               className={`
                 relative min-h-[220px] rounded-2xl border-2 border-dashed transition-all duration-200
-                flex flex-col items-center justify-center gap-4 p-8
-                ${
-                  state.phase === "uploading"
-                    ? "cursor-default pointer-events-none"
-                    : "cursor-pointer"
-                }
+                flex flex-col items-center justify-center gap-4 p-8 cursor-pointer
                 ${
                   isDragging
                     ? "border-primary bg-primary/10 shadow-glow"
-                    : state.phase === "file-selected"
-                      ? "border-primary/50 bg-primary/5"
-                      : "border-border bg-card hover:border-primary/40 hover:bg-card/80"
+                    : "border-border bg-card hover:border-primary/40 hover:bg-card/80"
                 }
               `}
             >
-              {state.phase === "idle" && (
-                <>
-                  <motion.div
-                    className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center"
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{
-                      duration: 2.5,
-                      repeat: Number.POSITIVE_INFINITY,
-                      ease: "easeInOut",
-                    }}
-                  >
-                    <FileUp className="w-7 h-7 text-primary" />
-                  </motion.div>
-                  <div className="text-center">
-                    <p className="font-display text-lg font-semibold text-foreground">
-                      Tap to select a file
-                    </p>
-                    <p className="text-muted-foreground text-sm mt-1">
-                      or drag and drop here
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {state.phase === "file-selected" && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center space-y-3"
-                >
-                  <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto">
-                    {getMimeIcon(state.file.type, "w-7 h-7 text-primary")}
-                  </div>
-                  <div>
-                    <p className="font-display font-semibold text-foreground truncate max-w-[200px] mx-auto">
-                      {state.file.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatFileSize(state.file.size)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleReset();
-                    }}
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mx-auto"
-                  >
-                    <X className="w-3 h-3" /> Change file
-                  </button>
-                </motion.div>
-              )}
-
-              {state.phase === "uploading" && (
-                <motion.div
-                  data-ocid="send.loading_state"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center space-y-4 w-full"
-                >
-                  <motion.div
-                    className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto"
-                    animate={{ scale: [1, 1.05, 1] }}
-                    transition={{
-                      duration: 1.5,
-                      repeat: Number.POSITIVE_INFINITY,
-                    }}
-                  >
-                    <Upload className="w-7 h-7 text-primary" />
-                  </motion.div>
-                  <div>
-                    <p className="font-display font-semibold text-foreground">
-                      Uploading...
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {state.progress}%
-                    </p>
-                  </div>
-                  <Progress
-                    value={state.progress}
-                    className="h-2 rounded-full bg-secondary [&>[data-progress]]:bg-primary"
-                  />
-                </motion.div>
-              )}
+              <motion.div
+                className="w-16 h-16 rounded-2xl bg-secondary flex items-center justify-center"
+                animate={{ y: [0, -4, 0] }}
+                transition={{
+                  duration: 2.5,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                }}
+              >
+                <FileUp className="w-7 h-7 text-primary" />
+              </motion.div>
+              <div className="text-center">
+                <p className="font-display text-lg font-semibold text-foreground">
+                  {isDragging ? "Drop to upload" : "Tap or drop a file"}
+                </p>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Uploads instantly
+                </p>
+              </div>
             </label>
 
-            {/* Upload Button */}
-            {state.phase === "file-selected" && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                <Button
-                  data-ocid="send.upload_button"
-                  onClick={handleUpload}
-                  disabled={!actor}
-                  className="w-full h-14 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl font-display font-semibold text-base shadow-glow transition-all duration-200 active:scale-[0.98]"
-                >
-                  <Upload className="w-5 h-5 mr-2" />
-                  Upload & Get Code
-                </Button>
-              </motion.div>
-            )}
-
-            {/* Info */}
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground mt-4">
               <Clock className="w-3.5 h-3.5" />
               <span>Files expire after 24 hours</span>
             </div>
+          </motion.div>
+        )}
+
+        {/* Uploading State */}
+        {state.phase === "uploading" && (
+          <motion.div
+            key="uploading"
+            data-ocid="send.loading_state"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3 }}
+            className="bg-card border border-border rounded-2xl p-8 text-center space-y-6"
+          >
+            <motion.div
+              className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto"
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY }}
+            >
+              <Upload className="w-7 h-7 text-primary" />
+            </motion.div>
+            <div>
+              <p className="font-display font-semibold text-foreground">
+                Uploading...
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {state.file.name}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {getMimeIcon(state.file.type, "inline w-3.5 h-3.5 mr-1")}
+                {formatFileSize(state.file.size)} &middot; {state.progress}%
+              </p>
+            </div>
+            <Progress
+              value={state.progress}
+              className="h-2 rounded-full bg-secondary [&>[data-progress]]:bg-primary"
+            />
           </motion.div>
         )}
       </AnimatePresence>
