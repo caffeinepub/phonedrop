@@ -1,0 +1,113 @@
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque[opsz,wdth,wght].woff2")
+    format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sora";
+  src: url("/assets/fonts/Sora[wght].woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono[wght].woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0.12 0.015 250;
+    --foreground: 0.96 0.008 250;
+    --card: 0.16 0.018 250;
+    --card-foreground: 0.96 0.008 250;
+    --popover: 0.16 0.018 250;
+    --popover-foreground: 0.96 0.008 250;
+    --primary: 0.72 0.18 195;
+    --primary-foreground: 0.1 0.02 250;
+    --secondary: 0.22 0.02 250;
+    --secondary-foreground: 0.85 0.01 250;
+    --muted: 0.2 0.015 250;
+    --muted-foreground: 0.55 0.02 250;
+    --accent: 0.72 0.18 195;
+    --accent-foreground: 0.1 0.02 250;
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 0.97 0.005 250;
+    --success: 0.65 0.18 155;
+    --success-foreground: 0.1 0.02 250;
+    --border: 0.25 0.02 250;
+    --input: 0.22 0.02 250;
+    --ring: 0.72 0.18 195;
+    --radius: 1rem;
+    --chart-1: 0.72 0.18 195;
+    --chart-2: 0.65 0.18 155;
+    --chart-3: 0.7 0.16 280;
+    --chart-4: 0.68 0.2 55;
+    --chart-5: 0.6 0.22 25;
+    --sidebar: 0.14 0.018 250;
+    --sidebar-foreground: 0.96 0.008 250;
+    --sidebar-primary: 0.72 0.18 195;
+    --sidebar-primary-foreground: 0.1 0.02 250;
+    --sidebar-accent: 0.22 0.02 250;
+    --sidebar-accent-foreground: 0.85 0.01 250;
+    --sidebar-border: 0.25 0.02 250;
+    --sidebar-ring: 0.72 0.18 195;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: "Bricolage Grotesque", sans-serif;
+  }
+
+  .font-body {
+    font-family: "Sora", sans-serif;
+  }
+
+  .font-mono {
+    font-family: "Geist Mono", monospace;
+  }
+
+  .glow-teal {
+    box-shadow: 0 0 30px oklch(0.72 0.18 195 / 0.3), 0 0 60px
+      oklch(0.72 0.18 195 / 0.1);
+  }
+
+  .glow-text-teal {
+    text-shadow: 0 0 20px oklch(0.72 0.18 195 / 0.6);
+  }
+
+  .noise-bg {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+}
